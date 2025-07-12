@@ -1,3 +1,4 @@
+
 "use client";
 
 import Image from "next/image";
@@ -31,7 +32,7 @@ export function ProductCard({ product, onBuy, onBid, isProcessing }: ProductCard
       <CardHeader>
         <div className="aspect-video relative bg-muted rounded-md mb-2">
           <Image
-            src={`https://placehold.co/600x400/90ee90/228b22?text=${product.name}`}
+            src={`https://placehold.co/600x400.png`}
             alt={product.name}
             layout="fill"
             objectFit="cover"
@@ -72,5 +73,3 @@ export function ProductCard({ product, onBuy, onBid, isProcessing }: ProductCard
     </Card>
   );
 }
-
-    

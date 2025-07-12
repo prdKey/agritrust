@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -106,6 +107,13 @@ export function BuyerDashboard() {
     setBidDialogOpen(true);
   };
   
+  const resetAllStates = () => {
+    setProductToBuy(null);
+    setSelectedProductId(null);
+    resetApprove();
+    resetOrder();
+  };
+
   // --- Effects ---
   useEffect(() => {
     if (isApproved && productToBuy) {
@@ -122,18 +130,21 @@ export function BuyerDashboard() {
     if (isOrdered) {
       toast({ title: "Success!", description: "Transaction confirmed." });
       refetchAll();
-      setProductToBuy(null);
-      resetApprove();
-      resetOrder();
+      resetAllStates();
     }
     const error = approveReceiptError || orderReceiptError;
     if (error) {
       toast({ variant: "destructive", title: "Error", description: error.message });
-      setProductToBuy(null);
-      resetApprove();
-      resetOrder();
+      resetAllStates();
     }
-  }, [isOrdered, approveReceiptError, orderReceiptError, toast, refetchAll, resetApprove, resetOrder]);
+  }, [isOrdered, approveReceiptError, orderReceiptError, toast, refetchAll]);
+  
+  // Clean up state if component unmounts or user changes tabs
+  useEffect(() => {
+    return () => {
+        resetAllStates();
+    }
+  }, []);
 
   const isProcessing = isApproving || isApproveConfirming || isOrdering || isOrderConfirming;
 
@@ -151,7 +162,7 @@ export function BuyerDashboard() {
           ) : products.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {products.map((product) => (
-                <ProductCard key={product.id.toString()} product={product} onBuy={handleBuy} onBid={handleBid} isProcessing={isProcessing} />
+                <ProductCard key={product.id.toString()} product={product} onBuy={handleBuy} onBid={handleBid} isProcessing={isProcessing && productToBuy?.productId === product.id} />
               ))}
             </div>
           ) : (
