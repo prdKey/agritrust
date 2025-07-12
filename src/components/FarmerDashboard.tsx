@@ -6,25 +6,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Button } from "./ui/button";
 import { CreateProductForm } from "./CreateProductForm";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
-import { Gavel, Info, Loader2, PackagePlus, Settings, Tag } from "lucide-react";
+import { Gavel, Info, LineChart, Loader2, PackagePlus, Settings, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import React, { useEffect, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { AnalyticsDashboard } from "./AnalyticsDashboard";
 
 export function FarmerDashboard() {
   const { address } = useAccount();
   const { toast } = useToast();
   
   // --- Contract write hooks ---
-  const { data: hash, writeContract, isPending, error } = useWriteContract();
-  const { data: acceptBidHash, writeContract: acceptBid, isPending: isAcceptingBid } = useWriteContract();
-  const { data: setFeeHash, writeContract: setFee, isPending: isSettingFee } = useWriteContract();
+  const { writeContract: acceptBid, isPending: isAcceptingBid, data: acceptBidHash, error: acceptBidError, reset: resetAcceptBid } = useWriteContract();
+  const { writeContract: setFee, isPending: isSettingFee, data: setFeeHash, error: setFeeError, reset: resetSetFee } = useWriteContract();
 
   // --- Transaction confirmation hooks ---
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
   const { isLoading: isConfirmingAccept, isSuccess: isConfirmedAccept } = useWaitForTransactionReceipt({ hash: acceptBidHash });
   const { isLoading: isConfirmingSetFee, isSuccess: isConfirmedSetFee } = useWaitForTransactionReceipt({ hash: setFeeHash });
   
@@ -90,25 +89,33 @@ export function FarmerDashboard() {
     });
   };
 
+  const resetAllStates = () => {
+    setBidToAccept(null);
+    resetAcceptBid();
+    resetSetFee();
+  }
+
   useEffect(() => {
-    if (isConfirmed || isConfirmedAccept || isConfirmedSetFee) {
+    if (isConfirmedAccept || isConfirmedSetFee) {
       toast({ title: "Success!", description: "Transaction confirmed." });
       refetchAll();
-      setBidToAccept(null);
+      resetAllStates();
     }
-    const anyError = error; // Add other error states here
+    const anyError = acceptBidError || setFeeError;
     if (anyError) {
       toast({ variant: "destructive", title: "Error", description: anyError.message });
+      resetAllStates();
     }
-  }, [isConfirmed, isConfirmedAccept, isConfirmedSetFee, error, toast, refetchAll]);
+  }, [isConfirmedAccept, isConfirmedSetFee, acceptBidError, setFeeError, toast, refetchAll]);
 
   const isLoadingProducts = contractReads === undefined || isLoadingProductDetails;
 
   return (
     <Tabs defaultValue="products" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="products"><PackagePlus className="w-4 h-4 mr-2"/>Products</TabsTrigger>
             <TabsTrigger value="bids"><Gavel className="w-4 h-4 mr-2"/>Incoming Bids</TabsTrigger>
+            <TabsTrigger value="analytics"><LineChart className="w-4 h-4 mr-2"/>Analytics</TabsTrigger>
             <TabsTrigger value="settings"><Settings className="w-4 h-4 mr-2"/>Settings</TabsTrigger>
         </TabsList>
 
@@ -220,6 +227,10 @@ export function FarmerDashboard() {
                     </div>
                 </CardContent>
             </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-6">
+            <AnalyticsDashboard products={farmerProducts} />
         </TabsContent>
         
         <TabsContent value="settings" className="mt-6">
