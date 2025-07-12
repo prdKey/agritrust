@@ -32,7 +32,7 @@ interface CreateProductFormProps {
 export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
-  const { data: hash, writeContract, isPending, error } = useWriteContract();
+  const { data: hash, writeContract, isPending, error, reset } = useWriteContract();
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -60,12 +60,14 @@ export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
       toast({ title: "Success!", description: "Product created successfully." });
       form.reset();
       setIsOpen(false);
+      reset(); // Reset wagmi hook state
       onSuccess?.();
     }
     if (error) {
       toast({ variant: "destructive", title: "Error creating product", description: error.message });
+      reset(); // Reset wagmi hook state
     }
-  }, [isConfirmed, error, toast, form, onSuccess]);
+  }, [isConfirmed, error, toast, form, onSuccess, reset]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -98,7 +100,7 @@ export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Price (in AGT)</FormLabel>
-                  <FormControl><Input type="number" placeholder="e.g., 5.5" {...field} /></FormControl>
+                  <FormControl><Input type="number" placeholder="e.g., 5.5" {...field} min="0" step="any" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -120,7 +122,7 @@ export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Quantity per Unit</FormLabel>
-                  <FormControl><Input type="number" placeholder="e.g., 1" {...field} /></FormControl>
+                  <FormControl><Input type="number" placeholder="e.g., 1" {...field} min="1" step="1" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -131,7 +133,7 @@ export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Initial Stock</FormLabel>
-                  <FormControl><Input type="number" placeholder="e.g., 100" {...field} /></FormControl>
+                  <FormControl><Input type="number" placeholder="e.g., 100" {...field} min="0" step="1" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
