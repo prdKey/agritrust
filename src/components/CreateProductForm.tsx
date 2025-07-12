@@ -32,14 +32,14 @@ interface CreateProductFormProps {
 export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
-  const { data: hash, writeContract, isPending, error, reset } = useWriteContract();
+  const { data: hash, writeContract, isPending, error: writeError, reset } = useWriteContract();
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: { name: "", price: 0, unit: "", quantity: 1, stock: 0 },
   });
 
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess: isConfirmed, error: receiptError } = useWaitForTransactionReceipt({ hash });
 
   const onSubmit = (data: ProductFormValues) => {
     writeContract({
@@ -58,16 +58,21 @@ export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
   useEffect(() => {
     if (isConfirmed) {
       toast({ title: "Success!", description: "Product created successfully." });
-      form.reset();
       setIsOpen(false);
-      reset(); // Reset wagmi hook state
       onSuccess?.();
     }
-    if (error) {
-      toast({ variant: "destructive", title: "Error creating product", description: error.message });
-      reset(); // Reset wagmi hook state
+    if (writeError || receiptError) {
+      const errorMessage = writeError?.message || receiptError?.message || "An unknown error occurred.";
+      toast({ variant: "destructive", title: "Error creating product", description: errorMessage });
     }
-  }, [isConfirmed, error, toast, form, onSuccess, reset]);
+  }, [isConfirmed, writeError, receiptError, toast, onSuccess]);
+
+  useEffect(() => {
+    if(!isOpen) {
+        form.reset();
+        reset();
+    }
+  }, [isOpen, form, reset]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

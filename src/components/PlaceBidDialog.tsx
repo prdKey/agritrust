@@ -28,20 +28,17 @@ interface PlaceBidDialogProps {
   onSuccess?: () => void;
 }
 
-type TransactionStep = "idle" | "approving" | "approve-confirming" | "bidding" | "bid-confirming";
-
 export function PlaceBidDialog({ productId, open, onOpenChange, onSuccess }: PlaceBidDialogProps) {
   const { address } = useAccount();
   const { toast } = useToast();
-  const [step, setStep] = useState<TransactionStep>("idle");
   
   // --- Contract Hooks ---
-  const { data: approveHash, writeContract: approve, reset: resetApprove } = useWriteContract();
-  const { data: bidHash, writeContract: placeBid, reset: resetPlaceBid } = useWriteContract();
+  const { data: approveHash, writeContract: approve, isPending: isApproving, error: approveError, reset: resetApprove } = useWriteContract();
+  const { data: bidHash, writeContract: placeBid, isPending: isBidding, error: bidError, reset: resetPlaceBid } = useWriteContract();
   
   // --- Transaction Receipt Hooks ---
-  const { isLoading: isApproving, isSuccess: isApproved } = useWaitForTransactionReceipt({ hash: approveHash });
-  const { isLoading: isBidding, isSuccess: isBidPlaced } = useWaitForTransactionReceipt({ hash: bidHash });
+  const { isLoading: isApproveConfirming, isSuccess: isApproved, error: approveReceiptError } = useWaitForTransactionReceipt({ hash: approveHash });
+  const { isLoading: isBidConfirming, isSuccess: isBidPlaced, error: bidReceiptError } = useWaitForTransactionReceipt({ hash: bidHash });
 
   // --- Data Hooks ---
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
@@ -61,14 +58,12 @@ export function PlaceBidDialog({ productId, open, onOpenChange, onSuccess }: Pla
   const onSubmit = (data: BidFormValues) => {
     const requiredAmount = parseUnits(data.amount.toString(), 18);
     if (allowance !== undefined && allowance >= requiredAmount) {
-      setStep("bidding");
       placeBid({
         ...marketplaceContract,
         functionName: 'placeBid',
         args: [productId, requiredAmount]
       });
     } else {
-      setStep("approving");
       approve({
         ...tokenContract,
         functionName: 'approve',
@@ -78,14 +73,9 @@ export function PlaceBidDialog({ productId, open, onOpenChange, onSuccess }: Pla
   };
 
   useEffect(() => {
-    if(isApproving) setStep("approve-confirming");
-  }, [isApproving]);
-
-  useEffect(() => {
     if (isApproved) {
       toast({ title: "Approval Confirmed", description: "You can now place your bid." });
       refetchAllowance();
-      setStep("bidding");
       placeBid({
         ...marketplaceContract,
         functionName: 'placeBid',
@@ -94,43 +84,43 @@ export function PlaceBidDialog({ productId, open, onOpenChange, onSuccess }: Pla
     }
   }, [isApproved, productId, placeBid, refetchAllowance, bidAmount, toast]);
   
-  useEffect(() => {
-    if(isBidding) setStep("bid-confirming");
-  }, [isBidding]);
 
   useEffect(() => {
     if (isBidPlaced) {
       toast({ title: "Success!", description: "Your bid has been placed." });
-      form.reset();
-      setStep("idle");
-      resetApprove();
-      resetPlaceBid();
+      onOpenChange(false);
       onSuccess?.();
     }
-  }, [isBidPlaced, toast, form, onSuccess, resetApprove, resetPlaceBid]);
+  }, [isBidPlaced, toast, onOpenChange, onSuccess]);
+
+  useEffect(() => {
+    const anyError = approveError || approveReceiptError || bidError || bidReceiptError;
+    if (anyError) {
+      const errorMessage = anyError.message || "An unknown error occurred.";
+      toast({ variant: "destructive", title: "Error", description: errorMessage });
+    }
+  }, [approveError, approveReceiptError, bidError, bidReceiptError, toast]);
+
 
   useEffect(() => {
     if (!open) {
       form.reset();
-      setStep("idle");
       resetApprove();
       resetPlaceBid();
     }
   }, [open, form, resetApprove, resetPlaceBid]);
 
-  const isLoading = isApproving || isBidding;
+  const isLoading = isApproving || isApproveConfirming || isBidding || isBidConfirming;
   const buttonText = () => {
-    switch (step) {
-      case 'approving': return "Check Wallet for Approval...";
-      case 'approve-confirming': return "Confirming Approval...";
-      case 'bidding': return "Check Wallet to Place Bid...";
-      case 'bid-confirming': return "Placing Bid...";
-      default:
-        if (allowance !== undefined && allowance >= bidAmount) {
+      if (isApproving) return "Check Wallet for Approval...";
+      if (isApproveConfirming) return "Confirming Approval...";
+      if (isBidding) return "Check Wallet to Place Bid...";
+      if (isBidConfirming) return "Placing Bid...";
+      
+      if (allowance !== undefined && bidAmount > 0n && allowance >= bidAmount) {
           return "Place Bid";
-        }
-        return "Approve & Place Bid";
-    }
+      }
+      return "Approve & Place Bid";
   };
 
   return (
