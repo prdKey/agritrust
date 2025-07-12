@@ -19,17 +19,30 @@ export function BuyerDashboard() {
   const { toast } = useToast();
   const [selectedProductId, setSelectedProductId] = useState<bigint | null>(null);
   const [isBidDialogOpen, setBidDialogOpen] = useState(false);
+  const [productToBuy, setProductToBuy] = useState<{ productId: bigint, quantity: bigint } | null>(null);
 
   // --- Contract Interactions ---
-  const { data: hash, writeContract, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+  const { data: approveHash, writeContract: approve, isPending: isApproving, reset: resetApprove } = useWriteContract();
+  const { data: orderHash, writeContract: placeOrder, isPending: isOrdering, reset: resetOrder } = useWriteContract();
+
+  // --- Transaction Receipts ---
+  const { isLoading: isApproveConfirming, isSuccess: isApproved, error: approveReceiptError } = useWaitForTransactionReceipt({ hash: approveHash });
+  const { isLoading: isOrderConfirming, isSuccess: isOrdered, error: orderReceiptError } = useWaitForTransactionReceipt({ hash: orderHash });
+
 
   // --- Data Fetching ---
-  const { data: productIds, refetch: refetchProducts, isLoading: isLoadingProducts } = useReadContracts({
-    contracts: [{ ...marketplaceContract, functionName: 'getAllProducts' }]
+  const { data: contractReads, refetch: refetchAll, isLoading: isLoadingInitialData } = useReadContracts({
+    contracts: [
+      { ...marketplaceContract, functionName: 'getAllProducts' },
+      { ...marketplaceContract, functionName: 'getUserOrders', args: [address!], query: { enabled: !!address } },
+      { ...marketplaceContract, functionName: 'getUserBids', args: [address!], query: { enabled: !!address } },
+      { ...marketplaceContract, functionName: 'operationFee' }
+    ]
   });
 
-  const productDetailsContracts = (productIds?.[0]?.result ?? []).map(id => ({
+  const [productIds, userOrderIds, userBidIds, operationFee] = contractReads?.map(r => r.result) ?? [];
+
+  const productDetailsContracts = (productIds as bigint[] ?? []).map(id => ({
     ...marketplaceContract,
     functionName: 'getProduct',
     args: [id]
@@ -38,42 +51,32 @@ export function BuyerDashboard() {
   const { data: productsData, isLoading: isLoadingProductDetails, refetch: refetchProductDetails } = useReadContracts({
     contracts: productDetailsContracts,
     query: {
-      enabled: !!productIds?.[0]?.result,
+      enabled: !!productIds,
     }
   });
   
   const products: Product[] = productsData?.map(p => p.result as Product).filter(Boolean) ?? [];
 
   // User Orders
-  const { data: userOrderIds, refetch: refetchOrders, isLoading: isLoadingOrders } = useReadContracts({
-    contracts: [{ ...marketplaceContract, functionName: 'getUserOrders', args: [address!] }],
-    query: { enabled: !!address }
-  });
-
-  const orderDetailsContracts = (userOrderIds?.[0].result ?? []).map(id => ({
+  const orderDetailsContracts = (userOrderIds as bigint[] ?? []).map(id => ({
     ...marketplaceContract, functionName: 'getOrderDetails', args: [id]
   }));
 
-  const { data: ordersData, isLoading: isLoadingOrderDetails } = useReadContracts({
+  const { data: ordersData, isLoading: isLoadingOrderDetails, refetch: refetchOrders } = useReadContracts({
     contracts: orderDetailsContracts,
-    query: { enabled: !!userOrderIds?.[0].result }
+    query: { enabled: !!userOrderIds }
   });
 
   const orders: Order[] = ordersData?.map(o => o.result as Order).filter(Boolean) ?? [];
 
   // User Bids
-  const { data: userBidIds, refetch: refetchBids, isLoading: isLoadingBids } = useReadContracts({
-    contracts: [{ ...marketplaceContract, functionName: 'getUserBids', args: [address!] }],
-    query: { enabled: !!address }
-  });
-
-  const bidDetailsContracts = (userBidIds?.[0].result ?? []).map(id => ({
+  const bidDetailsContracts = (userBidIds as bigint[] ?? []).map(id => ({
     ...marketplaceContract, functionName: 'getBidDetails', args: [id]
   }));
 
-  const { data: bidsData, isLoading: isLoadingBidDetails } = useReadContracts({
+  const { data: bidsData, isLoading: isLoadingBidDetails, refetch: refetchBids } = useReadContracts({
     contracts: bidDetailsContracts,
-    query: { enabled: !!userBidIds?.[0].result }
+    query: { enabled: !!userBidIds }
   });
 
   const bids: Bid[] = bidsData?.map(b => b.result as Bid).filter(Boolean) ?? [];
@@ -81,30 +84,17 @@ export function BuyerDashboard() {
   // --- Handlers ---
   const handleBuy = async (productId: bigint, quantity: bigint) => {
     const product = products.find(p => p.id === productId);
-    if (!product) return;
+    if (!product || operationFee === undefined) return;
+    setProductToBuy({ productId, quantity });
 
     const totalPrice = product.price * quantity;
+    const totalCost = totalPrice + (operationFee as bigint);
     
-    // Simple flow: approve and then place order. A more robust solution would check allowance first.
     toast({ title: "Action Required", description: "Please approve the token transfer in your wallet." });
-    writeContract({
+    approve({
       ...tokenContract,
       functionName: 'approve',
-      args: [marketplaceContract.address, totalPrice]
-    }, {
-      onSuccess: (approveHash) => {
-        toast({ title: "Approval Sent", description: "Waiting for confirmation..." });
-        // In a real app, you'd wait for this hash to confirm before the next step.
-        // For simplicity, we'll just prompt the user for the next action.
-        setTimeout(() => {
-          toast({ title: "Action Required", description: "Please confirm the order in your wallet." });
-          writeContract({
-            ...marketplaceContract,
-            functionName: 'placeOrder',
-            args: [productId, quantity]
-          });
-        }, 5000); // Naive wait
-      }
+      args: [marketplaceContract.address, totalCost]
     });
   };
 
@@ -112,19 +102,37 @@ export function BuyerDashboard() {
     setSelectedProductId(productId);
     setBidDialogOpen(true);
   };
+  
+  // --- Effects ---
+  useEffect(() => {
+    if (isApproved && productToBuy) {
+        toast({ title: "Approval Confirmed", description: "You can now place your order." });
+        placeOrder({
+            ...marketplaceContract,
+            functionName: 'placeOrder',
+            args: [productToBuy.productId, productToBuy.quantity]
+        });
+    }
+  }, [isApproved, productToBuy, placeOrder, toast]);
 
   useEffect(() => {
-    if (isConfirmed) {
+    if (isOrdered) {
       toast({ title: "Success!", description: "Transaction confirmed." });
-      refetchProducts();
-      refetchProductDetails();
-      refetchOrders();
-      refetchBids();
+      refetchAll();
+      setProductToBuy(null);
+      resetApprove();
+      resetOrder();
     }
+    const error = approveReceiptError || orderReceiptError;
     if (error) {
       toast({ variant: "destructive", title: "Error", description: error.message });
+      setProductToBuy(null);
+      resetApprove();
+      resetOrder();
     }
-  }, [isConfirmed, error, toast, refetchProducts, refetchProductDetails, refetchOrders, refetchBids]);
+  }, [isOrdered, approveReceiptError, orderReceiptError, toast, refetchAll, resetApprove, resetOrder]);
+
+  const isProcessing = isApproving || isApproveConfirming || isOrdering || isOrderConfirming;
 
   return (
     <>
@@ -135,12 +143,12 @@ export function BuyerDashboard() {
           <TabsTrigger value="bids"><Gavel className="w-4 h-4 mr-2"/>My Bids</TabsTrigger>
         </TabsList>
         <TabsContent value="marketplace" className="mt-6">
-          {(isLoadingProducts || isLoadingProductDetails) ? (
+          {isLoadingInitialData || isLoadingProductDetails ? (
              <div className="flex items-center justify-center gap-2 text-muted-foreground p-8"> <Loader2 className="w-6 h-6 animate-spin" /> Loading products... </div>
           ) : products.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {products.map((product) => (
-                <ProductCard key={product.id.toString()} product={product} onBuy={handleBuy} onBid={handleBid} />
+                <ProductCard key={product.id.toString()} product={product} onBuy={handleBuy} onBid={handleBid} isProcessing={isProcessing} />
               ))}
             </div>
           ) : (
@@ -160,7 +168,7 @@ export function BuyerDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoadingOrders || isLoadingOrderDetails ? (
+                {isLoadingOrderDetails ? (
                   <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="inline w-4 h-4 animate-spin"/> Loading...</TableCell></TableRow>
                 ) : orders.length > 0 ? (
                   orders.map((order) => (
@@ -191,7 +199,7 @@ export function BuyerDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoadingBids || isLoadingBidDetails ? (
+                {isLoadingBidDetails ? (
                   <TableRow><TableCell colSpan={4} className="text-center"><Loader2 className="inline w-4 h-4 animate-spin"/> Loading...</TableCell></TableRow>
                 ) : bids.length > 0 ? (
                   bids.map((bid) => (
@@ -215,6 +223,7 @@ export function BuyerDashboard() {
       {selectedProductId && (
           <PlaceBidDialog
             productId={selectedProductId}
+            operationFee={operationFee as bigint | undefined}
             open={isBidDialogOpen}
             onOpenChange={setBidDialogOpen}
             onSuccess={() => {
@@ -226,3 +235,5 @@ export function BuyerDashboard() {
     </>
   );
 }
+
+    

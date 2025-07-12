@@ -13,14 +13,16 @@ import { Button } from "@/components/ui/button";
 import type { Product } from "@/lib/contracts";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
+import { Loader2 } from "lucide-react";
 
 interface ProductCardProps {
   product: Product;
   onBuy?: (productId: bigint, quantity: bigint) => void;
   onBid?: (productId: bigint) => void;
+  isProcessing?: boolean;
 }
 
-export function ProductCard({ product, onBuy, onBid }: ProductCardProps) {
+export function ProductCard({ product, onBuy, onBid, isProcessing }: ProductCardProps) {
   const { address } = useAccount();
   const isOwner = address === product.farmer;
 
@@ -59,13 +61,16 @@ export function ProductCard({ product, onBuy, onBid }: ProductCardProps) {
         </div>
       </CardContent>
       <CardFooter className="flex gap-2">
-        {onBuy && <Button className="w-full" onClick={() => onBuy(product.id, 1n)} disabled={isOwner || product.stock === 0n}>
+        {onBuy && <Button className="w-full" onClick={() => onBuy(product.id, 1n)} disabled={isOwner || product.stock === 0n || isProcessing}>
+          {isProcessing && <Loader2 className="w-4 h-4 animate-spin mr-2"/>}
           {product.stock === 0n ? "Out of Stock" : "Buy Now"}
         </Button>}
-        {onBid && <Button variant="secondary" className="w-full" onClick={() => onBid(product.id)} disabled={isOwner}>
+        {onBid && <Button variant="secondary" className="w-full" onClick={() => onBid(product.id)} disabled={isOwner || isProcessing}>
           Place Bid
         </Button>}
       </CardFooter>
     </Card>
   );
 }
+
+    

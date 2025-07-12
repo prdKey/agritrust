@@ -23,14 +23,16 @@ type BidFormValues = z.infer<typeof bidSchema>;
 
 interface PlaceBidDialogProps {
   productId: bigint;
+  operationFee: bigint | undefined;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
 
-export function PlaceBidDialog({ productId, open, onOpenChange, onSuccess }: PlaceBidDialogProps) {
+export function PlaceBidDialog({ productId, operationFee, open, onOpenChange, onSuccess }: PlaceBidDialogProps) {
   const { address } = useAccount();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // --- Contract Hooks ---
   const { data: approveHash, writeContract: approve, isPending: isApproving, error: approveError, reset: resetApprove } = useWriteContract();
@@ -56,8 +58,15 @@ export function PlaceBidDialog({ productId, open, onOpenChange, onSuccess }: Pla
   const bidAmount = parseUnits(form.watch("amount")?.toString() || '0', 18);
 
   const onSubmit = (data: BidFormValues) => {
+    if (operationFee === undefined) {
+        toast({ variant: "destructive", title: "Error", description: "Could not retrieve operation fee." });
+        return;
+    }
+    setIsSubmitting(true);
     const requiredAmount = parseUnits(data.amount.toString(), 18);
-    if (allowance !== undefined && allowance >= requiredAmount) {
+    const totalAmount = requiredAmount + operationFee;
+
+    if (allowance !== undefined && allowance >= totalAmount) {
       placeBid({
         ...marketplaceContract,
         functionName: 'placeBid',
@@ -67,7 +76,7 @@ export function PlaceBidDialog({ productId, open, onOpenChange, onSuccess }: Pla
       approve({
         ...tokenContract,
         functionName: 'approve',
-        args: [marketplaceContract.address, requiredAmount]
+        args: [marketplaceContract.address, totalAmount]
       });
     }
   };
@@ -88,6 +97,7 @@ export function PlaceBidDialog({ productId, open, onOpenChange, onSuccess }: Pla
   useEffect(() => {
     if (isBidPlaced) {
       toast({ title: "Success!", description: "Your bid has been placed." });
+      setIsSubmitting(false);
       onOpenChange(false);
       onSuccess?.();
     }
@@ -98,6 +108,7 @@ export function PlaceBidDialog({ productId, open, onOpenChange, onSuccess }: Pla
     if (anyError) {
       const errorMessage = anyError.message || "An unknown error occurred.";
       toast({ variant: "destructive", title: "Error", description: errorMessage });
+      setIsSubmitting(false);
     }
   }, [approveError, approveReceiptError, bidError, bidReceiptError, toast]);
 
@@ -107,17 +118,22 @@ export function PlaceBidDialog({ productId, open, onOpenChange, onSuccess }: Pla
       form.reset();
       resetApprove();
       resetPlaceBid();
+      setIsSubmitting(false);
     }
   }, [open, form, resetApprove, resetPlaceBid]);
 
-  const isLoading = isApproving || isApproveConfirming || isBidding || isBidConfirming;
+  const isLoading = isApproving || isApproveConfirming || isBidding || isBidConfirming || isSubmitting;
   const buttonText = () => {
       if (isApproving) return "Check Wallet for Approval...";
       if (isApproveConfirming) return "Confirming Approval...";
       if (isBidding) return "Check Wallet to Place Bid...";
       if (isBidConfirming) return "Placing Bid...";
+
+      if (operationFee === undefined) return "Loading...";
+
+      const totalAmount = bidAmount + operationFee;
       
-      if (allowance !== undefined && bidAmount > 0n && allowance >= bidAmount) {
+      if (allowance !== undefined && bidAmount > 0n && allowance >= totalAmount) {
           return "Place Bid";
       }
       return "Approve & Place Bid";
@@ -157,3 +173,5 @@ export function PlaceBidDialog({ productId, open, onOpenChange, onSuccess }: Pla
     </Dialog>
   );
 }
+
+    
