@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAccount, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
@@ -37,9 +38,9 @@ export function FarmerDashboard() {
   const { writeContract: transferTokens, data: transferHash, isPending: isTransferring, error: transferError, reset: resetTransfer } = useWriteContract();
 
   // --- Transaction confirmation hooks ---
-  const { isLoading: isConfirmingAccept, isSuccess: isConfirmedAccept } = useWaitForTransactionReceipt({ hash: acceptBidHash });
-  const { isLoading: isConfirmingSetFee, isSuccess: isConfirmedSetFee } = useWaitForTransactionReceipt({ hash: setFeeHash });
-  const { isLoading: isConfirmingTransfer, isSuccess: isTransferred } = useWaitForTransactionReceipt({ hash: transferHash });
+  const { isLoading: isConfirmingAccept, isSuccess: isConfirmedAccept, error: receiptErrorAccept } = useWaitForTransactionReceipt({ hash: acceptBidHash });
+  const { isLoading: isConfirmingSetFee, isSuccess: isConfirmedSetFee, error: receiptErrorSetFee } = useWaitForTransactionReceipt({ hash: setFeeHash });
+  const { isLoading: isConfirmingTransfer, isSuccess: isTransferred, error: receiptErrorTransfer } = useWaitForTransactionReceipt({ hash: transferHash });
   
   // --- State ---
   const [bidToAccept, setBidToAccept] = useState<bigint | null>(null);
@@ -120,26 +121,50 @@ export function FarmerDashboard() {
     })
   };
 
-  const resetAllStates = () => {
-    setBidToAccept(null);
-    resetAcceptBid();
-    resetSetFee();
-    resetTransfer();
-    transferForm.reset();
-  }
+  // --- Effects for handling transaction results ---
 
   useEffect(() => {
-    if (isConfirmedAccept || isConfirmedSetFee || isTransferred) {
-      toast({ title: "Success!", description: "Transaction confirmed." });
-      refetchAll();
-      resetAllStates();
+    if (isConfirmedAccept) {
+        toast({ title: "Success!", description: "Bid accepted successfully." });
+        refetchAll();
+        setBidToAccept(null);
+        resetAcceptBid();
     }
-    const anyError = acceptBidError || setFeeError || transferError;
-    if (anyError) {
-      toast({ variant: "destructive", title: "Error", description: anyError.message });
-      resetAllStates();
+    const error = acceptBidError || receiptErrorAccept;
+    if (error) {
+        toast({ variant: "destructive", title: "Error Accepting Bid", description: error.message });
+        setBidToAccept(null);
+        resetAcceptBid();
     }
-  }, [isConfirmedAccept, isConfirmedSetFee, isTransferred, acceptBidError, setFeeError, transferError, toast, refetchAll]);
+  }, [isConfirmedAccept, acceptBidError, receiptErrorAccept, toast, refetchAll, resetAcceptBid]);
+
+  useEffect(() => {
+    if (isConfirmedSetFee) {
+        toast({ title: "Success!", description: "Operation fee updated." });
+        refetchAll();
+        resetSetFee();
+    }
+    const error = setFeeError || receiptErrorSetFee;
+    if (error) {
+        toast({ variant: "destructive", title: "Error Setting Fee", description: error.message });
+        resetSetFee();
+    }
+  }, [isConfirmedSetFee, setFeeError, receiptErrorSetFee, toast, refetchAll, resetSetFee]);
+
+  useEffect(() => {
+    if (isTransferred) {
+        toast({ title: "Success!", description: "Tokens transferred successfully." });
+        refetchAll();
+        transferForm.reset();
+        resetTransfer();
+    }
+    const error = transferError || receiptErrorTransfer;
+    if (error) {
+        toast({ variant: "destructive", title: "Error Transferring Tokens", description: error.message });
+        resetTransfer();
+    }
+  }, [isTransferred, transferError, receiptErrorTransfer, toast, refetchAll, transferForm, resetTransfer]);
+
 
   const isLoadingProducts = contractReads === undefined || isLoadingProductDetails;
 
