@@ -65,6 +65,8 @@ export type Product = {
   quantity: bigint;
   stock: bigint;
   farmer: `0x${string}`;
+  // This is a client-side only field to simulate futures
+  biddingEndDate?: string; 
 };
 
 export type Order = {

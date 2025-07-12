@@ -13,15 +13,29 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { marketplaceContract } from "@/lib/contracts";
-import { Loader2 } from "lucide-react";
+import { Calendar, Loader2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { cn } from "@/lib/utils";
+import { Calendar as CalendarComponent } from "./ui/calendar";
+import { format } from "date-fns";
 
 const productSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
-  price: z.coerce.number().positive("Price must be positive"),
+  price: z.coerce.number().positive("Price must be a positive number (used as starting bid for futures)"),
   unit: z.string().min(1, "Unit is required (e.g., kg, piece, bundle)"),
   quantity: z.coerce.number().int().positive("Quantity must be a positive whole number"),
-  stock: z.coerce.number().int().min(0, "Stock cannot be negative"),
+  stock: z.coerce.number().int().min(0, "Stock cannot be negative. Set to 0 for a 'growing' product/future."),
+  biddingEndDate: z.date().optional(),
+}).refine(data => {
+    if (data.stock === 0) {
+        return !!data.biddingEndDate;
+    }
+    return true;
+}, {
+    message: "Bidding End Date is required for growing products (stock is 0)",
+    path: ["biddingEndDate"],
 });
+
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
@@ -38,10 +52,13 @@ export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
     resolver: zodResolver(productSchema),
     defaultValues: { name: "", price: 0, unit: "", quantity: 1, stock: 0 },
   });
+  
+  const stockValue = form.watch("stock");
 
   const { isLoading: isConfirming, isSuccess: isConfirmed, error: receiptError } = useWaitForTransactionReceipt({ hash });
 
   const onSubmit = (data: ProductFormValues) => {
+    // Note: The biddingEndDate is not sent to the contract, it's a client-side concept for this demo
     writeContract({
       ...marketplaceContract,
       functionName: "createProduct",
@@ -83,7 +100,7 @@ export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
         <DialogHeader>
           <DialogTitle>Create a New Product</DialogTitle>
           <DialogDescription>
-            Fill in the details below to list your product on the marketplace.
+            Fill in the details below. To list a future (a growing crop), set the Initial Stock to 0 and provide a bidding end date.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -143,6 +160,51 @@ export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
                 </FormItem>
               )}
             />
+
+            {stockValue === 0 && (
+                <FormField
+                control={form.control}
+                name="biddingEndDate"
+                render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                    <FormLabel>Bidding End Date</FormLabel>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                        <FormControl>
+                            <Button
+                            variant={"outline"}
+                            className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                            )}
+                            >
+                            {field.value ? (
+                                format(field.value, "PPP")
+                            ) : (
+                                <span>Pick a date</span>
+                            )}
+                            <Calendar className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                        </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) =>
+                                date < new Date()
+                            }
+                            initialFocus
+                        />
+                        </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            )}
+
             <DialogFooter>
               <Button type="submit" disabled={isPending || isConfirming}>
                 {(isPending || isConfirming) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
