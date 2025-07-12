@@ -21,7 +21,7 @@ const MarketAnalysisInputSchema = z.object({
 export type MarketAnalysisInput = z.infer<typeof MarketAnalysisInputSchema>;
 
 const MarketAnalysisOutputSchema = z.object({
-  report: z.string().describe("A comprehensive market analysis report in Markdown format. It should include sections for Market Trends, Price Analysis, and Actionable Recommendations."),
+  report: z.string().describe("A comprehensive market analysis report in Markdown format. It should include sections for Market Trends, Price Analysis, Supply and Demand, Weather Impact, and Actionable Recommendations."),
 });
 export type MarketAnalysisOutput = z.infer<typeof MarketAnalysisOutputSchema>;
 
@@ -50,9 +50,17 @@ Based on this data and general knowledge of agricultural markets, generate a rep
 - Evaluate the current pricing. Is it competitive?
 - Suggest potential pricing strategies (e.g., bundling, discounts for bulk orders).
 
+### Supply and Demand
+- Analyze the potential supply and demand for these products.
+- Consider factors like recent harvests, import/export trends, and consumer purchasing habits.
+
+### Weather Impact
+- Discuss how recent and forecasted weather patterns in major agricultural regions could impact the production and prices of these goods.
+- Provide insights on potential risks (e.g., drought, floods) and opportunities.
+
 ### Actionable Recommendations
 - Provide clear, actionable advice for the farmer.
-- Suggest which products to focus on, optimal stock levels, and potential new products to introduce.
+- Suggest which products to focus on, optimal stock levels, and potential new products to introduce based on the complete analysis.
 `,
 });
 
