@@ -33,7 +33,7 @@ export default function Home() {
     return (
       <div className="text-center flex flex-col items-center justify-center h-full gap-6">
         <Leaf className="w-24 h-24 text-primary" />
-        <h1 className="text-4xl md:text-5xl font-bold font-headline">Welcome to AgriBid</h1>
+        <h1 className="text-4xl md:text-5xl font-bold font-headline">Welcome to AgriTrust</h1>
         <p className="text-lg text-muted-foreground max-w-2xl">
           The decentralized marketplace connecting farmers directly with buyers.
           Connect your wallet to get started.

@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AgriBid",
+  title: "AgriTrust",
   description: "A decentralized marketplace for farmers and buyers.",
 };
 
