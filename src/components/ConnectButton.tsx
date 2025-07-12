@@ -14,12 +14,16 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Wallet, LogOut } from "lucide-react";
 import { formatUnits } from "viem";
 import { useEffect, useState } from "react";
+import { tokenContract } from "@/lib/contracts";
 
 export function ConnectButton() {
   const { address, isConnected, connector } = useAccount();
   const { connect, connectors, error, isPending } = useConnect();
   const { disconnect } = useDisconnect();
-  const { data: balance } = useBalance({ address });
+  const { data: balance } = useBalance({ 
+    address,
+    token: tokenContract.address,
+  });
 
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => {
@@ -51,7 +55,7 @@ export function ConnectButton() {
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="flex gap-2" disabled>
-             Balance: {balance ? `${parseFloat(formatUnits(balance.value, balance.decimals)).toFixed(4)} ${balance.symbol}`: '0 VIC'}
+             Balance: {balance ? `${parseFloat(formatUnits(balance.value, balance.decimals)).toFixed(4)} ${balance.symbol}`: '0 AGT'}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => disconnect()} className="flex gap-2 cursor-pointer text-destructive focus:text-destructive-foreground">
             <LogOut className="h-4 w-4" />
