@@ -82,9 +82,12 @@ export function BuyerDashboard() {
   const bids: Bid[] = bidsData?.map(b => b.result as Bid).filter(Boolean) ?? [];
 
   // --- Handlers ---
-  const handleBuy = async (productId: bigint, quantity: bigint) => {
+  const handleBuy = (productId: bigint, quantity: bigint) => {
     const product = products.find(p => p.id === productId);
-    if (!product || operationFee === undefined) return;
+    if (!product || operationFee === undefined) {
+      toast({ variant: "destructive", title: "Error", description: "Could not retrieve product details or operation fee." });
+      return;
+    };
     setProductToBuy({ productId, quantity });
 
     const totalPrice = product.price * quantity;
@@ -228,12 +231,10 @@ export function BuyerDashboard() {
             onOpenChange={setBidDialogOpen}
             onSuccess={() => {
                 setBidDialogOpen(false);
-                refetchBids();
+                refetchAll();
             }}
           />
       )}
     </>
   );
 }
-
-    

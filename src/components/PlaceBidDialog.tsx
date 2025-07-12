@@ -173,5 +173,3 @@ export function PlaceBidDialog({ productId, operationFee, open, onOpenChange, on
     </Dialog>
   );
 }
-
-    
