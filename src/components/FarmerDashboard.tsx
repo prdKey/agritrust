@@ -1,12 +1,12 @@
 "use client";
 
 import { useAccount, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
-import { marketplaceContract, type Product } from "@/lib/contracts";
+import { marketplaceContract, tokenContract, type Product } from "@/lib/contracts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { CreateProductForm } from "./CreateProductForm";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
-import { Gavel, Info, LineChart, Loader2, PackagePlus, Settings, Tag } from "lucide-react";
+import { Gavel, Info, LineChart, Loader2, PackagePlus, Send, Settings, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import React, { useEffect, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
@@ -14,6 +14,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "./ui/form";
+import { Input } from "./ui/input";
+
+const transferSchema = z.object({
+    recipient: z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Invalid wallet address"),
+    amount: z.coerce.number().positive("Amount must be positive"),
+});
+type TransferFormValues = z.infer<typeof transferSchema>;
+
 
 export function FarmerDashboard() {
   const { address } = useAccount();
@@ -22,24 +34,35 @@ export function FarmerDashboard() {
   // --- Contract write hooks ---
   const { writeContract: acceptBid, isPending: isAcceptingBid, data: acceptBidHash, error: acceptBidError, reset: resetAcceptBid } = useWriteContract();
   const { writeContract: setFee, isPending: isSettingFee, data: setFeeHash, error: setFeeError, reset: resetSetFee } = useWriteContract();
+  const { writeContract: transferTokens, data: transferHash, isPending: isTransferring, error: transferError, reset: resetTransfer } = useWriteContract();
 
   // --- Transaction confirmation hooks ---
   const { isLoading: isConfirmingAccept, isSuccess: isConfirmedAccept } = useWaitForTransactionReceipt({ hash: acceptBidHash });
   const { isLoading: isConfirmingSetFee, isSuccess: isConfirmedSetFee } = useWaitForTransactionReceipt({ hash: setFeeHash });
+  const { isLoading: isConfirmingTransfer, isSuccess: isTransferred } = useWaitForTransactionReceipt({ hash: transferHash });
   
   // --- State ---
   const [bidToAccept, setBidToAccept] = useState<bigint | null>(null);
+
+  // --- Form ---
+  const transferForm = useForm<TransferFormValues>({
+    resolver: zodResolver(transferSchema),
+    defaultValues: { recipient: "", amount: 0 },
+  });
+
 
   // --- Contract read hooks ---
   const { data: contractReads, refetch: refetchAll } = useReadContracts({
     contracts: [
         { ...marketplaceContract, functionName: 'getAllProducts' },
         { ...marketplaceContract, functionName: 'getUserBids', args: [address!], query: { enabled: !!address } },
-        { ...marketplaceContract, functionName: 'operationFee' }
+        { ...marketplaceContract, functionName: 'operationFee' },
+        { ...tokenContract, functionName: 'owner' },
     ]
   });
 
-  const [productIds, userBidIds, operationFee] = contractReads?.map(r => r.result) ?? [];
+  const [productIds, userBidIds, operationFee, tokenOwner] = contractReads?.map(r => r.result) ?? [];
+  const isOwner = address === tokenOwner;
 
   const productDetailsContracts = (productIds as bigint[] ?? []).map(id => ({
     ...marketplaceContract,
@@ -88,25 +111,35 @@ export function FarmerDashboard() {
         args: [0n]
     });
   };
+  
+  const handleTransfer = (data: TransferFormValues) => {
+    transferTokens({
+        ...tokenContract,
+        functionName: 'transfer',
+        args: [data.recipient as `0x${string}`, parseUnits(data.amount.toString(), 18)]
+    })
+  };
 
   const resetAllStates = () => {
     setBidToAccept(null);
     resetAcceptBid();
     resetSetFee();
+    resetTransfer();
+    transferForm.reset();
   }
 
   useEffect(() => {
-    if (isConfirmedAccept || isConfirmedSetFee) {
+    if (isConfirmedAccept || isConfirmedSetFee || isTransferred) {
       toast({ title: "Success!", description: "Transaction confirmed." });
       refetchAll();
       resetAllStates();
     }
-    const anyError = acceptBidError || setFeeError;
+    const anyError = acceptBidError || setFeeError || transferError;
     if (anyError) {
       toast({ variant: "destructive", title: "Error", description: anyError.message });
       resetAllStates();
     }
-  }, [isConfirmedAccept, isConfirmedSetFee, acceptBidError, setFeeError, toast, refetchAll]);
+  }, [isConfirmedAccept, isConfirmedSetFee, isTransferred, acceptBidError, setFeeError, transferError, toast, refetchAll]);
 
   const isLoadingProducts = contractReads === undefined || isLoadingProductDetails;
 
@@ -233,14 +266,14 @@ export function FarmerDashboard() {
             <AnalyticsDashboard products={farmerProducts} />
         </TabsContent>
         
-        <TabsContent value="settings" className="mt-6">
+        <TabsContent value="settings" className="mt-6 grid gap-8">
              <Card>
                 <CardHeader>
                     <div className="flex items-center gap-4">
                         <Tag className="w-8 h-8 text-primary" />
                         <div>
                         <CardTitle>Operation Fee</CardTitle>
-                        <CardDescription>Manage the fee for marketplace operations.</CardDescription>
+                        <CardDescription>Manage the fee for marketplace operations. Only the contract owner can change this.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -251,22 +284,62 @@ export function FarmerDashboard() {
                             {operationFee !== undefined ? `${formatUnits(operationFee as bigint, 18)} AGT` : <Loader2 className="w-4 h-4 animate-spin" />}
                         </p>
                    </div>
-                   <Alert>
-                        <Info className="h-4 w-4" />
-                        <AlertTitle>Note</AlertTitle>
-                        <AlertDescription>
-                            This fee is applied to certain transactions on the marketplace. Only the contract owner can change this fee.
-                        </AlertDescription>
-                    </Alert>
-                    <Button 
-                        onClick={handleSetFeeToZero} 
-                        disabled={isSettingFee || isConfirmingSetFee}
-                    >
-                         {(isSettingFee || isConfirmingSetFee) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Set Fee to Zero
-                    </Button>
+                    {isOwner && (
+                        <Button 
+                            onClick={handleSetFeeToZero} 
+                            disabled={isSettingFee || isConfirmingSetFee}
+                        >
+                             {(isSettingFee || isConfirmingSetFee) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Set Fee to Zero
+                        </Button>
+                    )}
                 </CardContent>
             </Card>
+            {isOwner && (
+                <Card>
+                    <CardHeader>
+                         <div className="flex items-center gap-4">
+                            <Send className="w-8 h-8 text-primary" />
+                            <div>
+                                <CardTitle>Transfer Tokens</CardTitle>
+                                <CardDescription>As the token owner, you can transfer AGT tokens to any address.</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <Form {...transferForm}>
+                            <form onSubmit={transferForm.handleSubmit(handleTransfer)} className="space-y-4">
+                                <FormField
+                                    control={transferForm.control}
+                                    name="recipient"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Recipient Address</FormLabel>
+                                            <FormControl><Input placeholder="0x..." {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={transferForm.control}
+                                    name="amount"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Amount (AGT)</FormLabel>
+                                            <FormControl><Input type="number" placeholder="e.g., 1000" {...field} min="0" step="any"/></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <Button type="submit" disabled={isTransferring || isConfirmingTransfer}>
+                                    {(isTransferring || isConfirmingTransfer) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    {isConfirmingTransfer ? "Confirming..." : isTransferring ? "Check Wallet..." : "Transfer Tokens"}
+                                </Button>
+                            </form>
+                        </Form>
+                    </CardContent>
+                </Card>
+            )}
         </TabsContent>
     </Tabs>
   );
