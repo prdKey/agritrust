@@ -8,7 +8,7 @@ import { ProductCard } from "./ProductCard";
 import { PlaceBidDialog } from "./PlaceBidDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "./ui/button";
-import { Card } from "./ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { formatUnits, parseUnits } from "viem";
 import { Loader2, ShoppingCart, Gavel, History } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";

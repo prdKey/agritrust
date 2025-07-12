@@ -13,12 +13,26 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Wallet, LogOut } from "lucide-react";
 import { formatUnits } from "viem";
+import { useEffect, useState } from "react";
 
 export function ConnectButton() {
   const { address, isConnected, connector } = useAccount();
   const { connect, connectors, error, isPending } = useConnect();
   const { disconnect } = useDisconnect();
   const { data: balance } = useBalance({ address });
+
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted) {
+    return (
+       <Button disabled={true}>
+         Loading...
+       </Button>
+    )
+  }
 
   if (isConnected) {
     return (
