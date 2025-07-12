@@ -1,10 +1,11 @@
+
 "use client";
 
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, LineChart } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Loader2, LineChart, PieChartIcon } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { Product } from '@/lib/contracts';
 import { formatUnits } from 'viem';
 import { marketAnalysis, type MarketAnalysisInput } from '@/ai/flows/market-analysis-flow';
@@ -14,6 +15,8 @@ interface AnalyticsDashboardProps {
   products: Product[];
 }
 
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1943'];
+
 export function AnalyticsDashboard({ products }: AnalyticsDashboardProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -21,7 +24,7 @@ export function AnalyticsDashboard({ products }: AnalyticsDashboardProps) {
 
   const chartData = products.map(product => ({
     name: product.name,
-    stock: Number(product.stock),
+    value: Number(product.stock),
   }));
 
   const handleGenerateAnalysis = async () => {
@@ -55,20 +58,36 @@ export function AnalyticsDashboard({ products }: AnalyticsDashboardProps) {
     <div className="grid gap-8">
       <Card>
         <CardHeader>
-          <CardTitle>Product Stock Levels</CardTitle>
-          <CardDescription>A summary of your current inventory.</CardDescription>
+          <div className="flex items-center gap-4">
+            <PieChartIcon className="w-8 h-8 text-primary" />
+            <div>
+              <CardTitle>Product Stock Distribution</CardTitle>
+              <CardDescription>A summary of your current inventory proportions.</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {products.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                  nameKey="name"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="stock" fill="hsl(var(--primary))" />
-              </BarChart>
+              </PieChart>
             </ResponsiveContainer>
           ) : (
             <p className="text-muted-foreground text-center">You have no products to analyze.</p>
