@@ -10,7 +10,6 @@ import { PlaceBidDialog } from "./PlaceBidDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { formatUnits, parseUnits } from "viem";
 import { Loader2, ShoppingCart, Gavel, History } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
@@ -193,7 +192,7 @@ export function BuyerDashboard() {
                       <TableCell>{order.id.toString()}</TableCell>
                       <TableCell>{order.productId.toString()}</TableCell>
                       <TableCell>{order.quantity.toString()}</TableCell>
-                      <TableCell>{formatUnits(order.totalPrice, 18)} AGT</TableCell>
+                      <TableCell>{order.totalPrice.toString()} AGT</TableCell>
                       <TableCell>{order.fulfilled ? <Badge>Yes</Badge> : <Badge variant="secondary">No</Badge>}</TableCell>
                     </TableRow>
                   ))
@@ -223,7 +222,7 @@ export function BuyerDashboard() {
                     <TableRow key={bid.id.toString()}>
                       <TableCell>{bid.id.toString()}</TableCell>
                       <TableCell>{bid.productId.toString()}</TableCell>
-                      <TableCell>{formatUnits(bid.amount, 18)} AGT</TableCell>
+                      <TableCell>{bid.amount.toString()} AGT</TableCell>
                       <TableCell>
                         {bid.completed ? <Badge>Completed</Badge> : bid.accepted ? <Badge variant="default">Accepted</Badge> : <Badge variant="secondary">Pending</Badge>}
                       </TableCell>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,7 +6,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseUnits } from "viem";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -21,7 +21,7 @@ import { format } from "date-fns";
 
 const productSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
-  price: z.coerce.number().positive("Price must be a positive number (used as starting bid for futures)"),
+  price: z.coerce.number().int().positive("Price must be a positive whole number"),
   unit: z.string().min(1, "Unit is required (e.g., kg, piece, bundle)"),
   quantity: z.coerce.number().int().positive("Quantity must be a positive whole number"),
   stock: z.coerce.number().int().min(0, "Stock cannot be negative. Set to 0 for a 'growing' product/future."),
@@ -64,7 +64,7 @@ export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
       functionName: "createProduct",
       args: [
         data.name,
-        parseUnits(data.price.toString(), 18),
+        BigInt(data.price),
         data.unit,
         BigInt(data.quantity),
         BigInt(data.stock),
@@ -122,7 +122,7 @@ export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Price (in AGT)</FormLabel>
-                  <FormControl><Input type="number" placeholder="e.g., 5.5" {...field} min="0" step="any" /></FormControl>
+                  <FormControl><Input type="number" placeholder="e.g., 5" {...field} min="0" step="1" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}

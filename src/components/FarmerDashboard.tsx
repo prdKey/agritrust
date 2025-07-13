@@ -10,7 +10,6 @@ import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Gavel, Info, LineChart, Loader2, PackagePlus, Send, Settings, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import React, { useEffect, useState } from "react";
-import { formatUnits, parseUnits } from "viem";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -23,7 +22,7 @@ import { Input } from "./ui/input";
 
 const transferSchema = z.object({
     recipient: z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Invalid wallet address"),
-    amount: z.coerce.number().positive("Amount must be positive"),
+    amount: z.coerce.number().int().positive("Amount must be a positive whole number"),
 });
 type TransferFormValues = z.infer<typeof transferSchema>;
 
@@ -120,7 +119,7 @@ export function FarmerDashboard() {
     transferTokens({
         ...tokenContract,
         functionName: 'transfer',
-        args: [data.recipient as `0x${string}`, parseUnits(data.amount.toString(), 18)]
+        args: [data.recipient as `0x${string}`, BigInt(data.amount)]
     })
   };
 
@@ -213,7 +212,7 @@ export function FarmerDashboard() {
                                 <CardDescription>Product ID: {product.id.toString()}</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <p><strong>Price:</strong> {formatUnits(product.price, 18)} AGT</p>
+                                <p><strong>Price:</strong> {product.price.toString()} AGT</p>
                                 <p><strong>Unit:</strong> {product.unit}</p>
                                 <p><strong>Stock:</strong> {product.stock.toString()}</p>
                             </CardContent>
@@ -263,7 +262,7 @@ export function FarmerDashboard() {
                                 {incomingBids.map((bid) => (
                                     <TableRow key={bid.id.toString()}>
                                         <TableCell>{bid.productId.toString()}</TableCell>
-                                        <TableCell>{formatUnits(bid.amount, 18)} AGT</TableCell>
+                                        <TableCell>{bid.amount.toString()} AGT</TableCell>
                                         <TableCell>{bid.bidder.slice(0, 6)}...{bid.bidder.slice(-4)}</TableCell>
                                         <TableCell>
                                             {bid.accepted ? <Badge variant="secondary">Accepted</Badge> : <Badge>Pending</Badge>}
@@ -309,7 +308,7 @@ export function FarmerDashboard() {
                    <div className="flex items-center justify-between p-4 border rounded-lg">
                         <p className="font-medium">Current Fee</p>
                         <p className="text-lg font-bold font-mono">
-                            {operationFee !== undefined ? `${formatUnits(operationFee as bigint, 18)} AGT` : <Loader2 className="w-4 h-4 animate-spin" />}
+                            {operationFee !== undefined ? `${(operationFee as bigint).toString()} AGT` : <Loader2 className="w-4 h-4 animate-spin" />}
                         </p>
                    </div>
                     {isOwner && (
@@ -354,7 +353,7 @@ export function FarmerDashboard() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Amount (AGT)</FormLabel>
-                                            <FormControl><Input type="number" placeholder="e.g., 1000" {...field} min="0" step="any"/></FormControl>
+                                            <FormControl><Input type="number" placeholder="e.g., 1000" {...field} min="0" step="1"/></FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )}

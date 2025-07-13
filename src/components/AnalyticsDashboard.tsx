@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Loader2, LineChart, PieChartIcon } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { Product } from '@/lib/contracts';
-import { formatUnits } from 'viem';
 import { marketAnalysis, type MarketAnalysisInput } from '@/ai/flows/market-analysis-flow';
 import { useToast } from '@/hooks/use-toast';
 
@@ -34,7 +33,7 @@ export function AnalyticsDashboard({ products }: AnalyticsDashboardProps) {
         const input: MarketAnalysisInput = {
             products: products.map(p => ({
                 name: p.name,
-                price: formatUnits(p.price, 18),
+                price: p.price.toString(),
                 unit: p.unit,
                 stock: p.stock.toString(),
             }))

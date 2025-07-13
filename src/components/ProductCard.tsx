@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { Product } from "@/lib/contracts";
-import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { Calendar, Loader2 } from "lucide-react";
 import { Badge } from "./ui/badge";
@@ -59,7 +58,7 @@ export function ProductCard({ product, onBuy, onBid, isProcessing }: ProductCard
         <div className="flex justify-between items-center mb-2">
             <span className="text-muted-foreground">{isGrowing ? "Starting Bid" : "Price"}</span>
             <span className="font-bold text-lg text-primary">
-                {formatUnits(product.price, 18)} AGT
+                {product.price.toString()} AGT
             </span>
         </div>
         <div className="flex justify-between items-center mb-2">

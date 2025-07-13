@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,7 +6,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
-import { parseUnits } from "viem";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -16,7 +16,7 @@ import { marketplaceContract, tokenContract } from "@/lib/contracts";
 import { Loader2 } from "lucide-react";
 
 const bidSchema = z.object({
-  amount: z.coerce.number().positive("Bid amount must be positive"),
+  amount: z.coerce.number().int().positive("Bid amount must be a positive whole number"),
 });
 
 type BidFormValues = z.infer<typeof bidSchema>;
@@ -55,7 +55,7 @@ export function PlaceBidDialog({ productId, operationFee, open, onOpenChange, on
     defaultValues: { amount: 0 },
   });
   
-  const bidAmount = parseUnits(form.watch("amount")?.toString() || '0', 18);
+  const bidAmountValue = form.watch("amount");
 
   const onSubmit = (data: BidFormValues) => {
     if (operationFee === undefined) {
@@ -63,7 +63,7 @@ export function PlaceBidDialog({ productId, operationFee, open, onOpenChange, on
         return;
     }
     setIsSubmitting(true);
-    const requiredAmount = parseUnits(data.amount.toString(), 18);
+    const requiredAmount = BigInt(data.amount);
     const totalAmount = requiredAmount + operationFee;
 
     if (allowance !== undefined && allowance >= totalAmount) {
@@ -88,10 +88,10 @@ export function PlaceBidDialog({ productId, operationFee, open, onOpenChange, on
       placeBid({
         ...marketplaceContract,
         functionName: 'placeBid',
-        args: [productId, bidAmount]
+        args: [productId, BigInt(bidAmountValue)]
       });
     }
-  }, [isApproved, productId, placeBid, refetchAllowance, bidAmount, toast]);
+  }, [isApproved, productId, placeBid, refetchAllowance, bidAmountValue, toast]);
   
 
   useEffect(() => {
@@ -131,9 +131,9 @@ export function PlaceBidDialog({ productId, operationFee, open, onOpenChange, on
 
       if (operationFee === undefined) return "Loading...";
 
-      const totalAmount = bidAmount + operationFee;
+      const totalAmount = BigInt(bidAmountValue) + operationFee;
       
-      if (allowance !== undefined && bidAmount > 0n && allowance >= totalAmount) {
+      if (allowance !== undefined && bidAmountValue > 0 && allowance >= totalAmount) {
           return "Place Bid";
       }
       return "Approve & Place Bid";
@@ -156,7 +156,7 @@ export function PlaceBidDialog({ productId, operationFee, open, onOpenChange, on
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Bid Amount (AGT)</FormLabel>
-                  <FormControl><Input type="number" placeholder="e.g., 100" {...field} min="0" step="any" /></FormControl>
+                  <FormControl><Input type="number" placeholder="e.g., 100" {...field} min="0" step="1" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
