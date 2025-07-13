@@ -76,9 +76,12 @@ export function FarmerDashboard() {
     query: { enabled: !!productIds }
   });
 
-  const farmerProducts = productsData
+  const allProducts = productsData
     ?.map(p => p.result as Product)
-    .filter(p => p && p.farmer === address) ?? [];
+    .filter(Boolean)
+    .filter(p => p.id > 4n) ?? [];
+
+  const farmerProducts = allProducts.filter(p => p.farmer === address);
     
   const bidDetailsContracts = (userBidIds as bigint[] ?? []).map(id => ({
     ...marketplaceContract,

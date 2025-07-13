@@ -56,7 +56,10 @@ export function BuyerDashboard() {
     }
   });
   
-  const products: Product[] = productsData?.map(p => p.result as Product).filter(Boolean) ?? [];
+  const products: Product[] = productsData
+    ?.map(p => p.result as Product)
+    .filter(Boolean)
+    .filter(p => p.id > 4n) ?? [];
 
   // User Orders
   const orderDetailsContracts = (userOrderIds as bigint[] ?? []).map(id => ({
