@@ -59,7 +59,7 @@ export function BuyerDashboard() {
   const products: Product[] = productsData
     ?.map(p => p.result as Product)
     .filter(Boolean)
-    .filter(p => p.id > 4n) ?? [];
+    .filter(p => p.id > 4n && p.id !== 5n) ?? [];
 
   // User Orders
   const orderDetailsContracts = (userOrderIds as bigint[] ?? []).map(id => ({
@@ -83,7 +83,7 @@ export function BuyerDashboard() {
     query: { enabled: !!userBidIds }
   });
 
-  const bids: Bid[] = bidsData?.map(b => b.result as Bid).filter(Boolean) ?? [];
+  const bids: Bid[] = bidsData?.map(b => b.result as Bid).filter(Boolean).filter(b => b.id !== 1n) ?? [];
 
   // --- Handlers ---
   const handleBuy = (productId: bigint, quantity: bigint) => {

@@ -79,7 +79,7 @@ export function FarmerDashboard() {
   const allProducts = productsData
     ?.map(p => p.result as Product)
     .filter(Boolean)
-    .filter(p => p.id > 4n) ?? [];
+    .filter(p => p.id > 4n && p.id !== 5n) ?? [];
 
   const farmerProducts = allProducts.filter(p => p.farmer === address);
     
@@ -96,7 +96,7 @@ export function FarmerDashboard() {
 
   const incomingBids = bidsData
     ?.map(b => b.result)
-    .filter(bid => bid && farmerProducts.some(p => p.id === bid.productId)) ?? [];
+    .filter(bid => bid && bid.id !== 1n && farmerProducts.some(p => p.id === bid.productId)) ?? [];
 
   // --- Handlers ---
   const handleAcceptBid = (bidId: bigint) => {
